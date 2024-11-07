@@ -104,6 +104,21 @@ for title in titles:
 ### 2. Crawling (PARTNER 1)
 
 ```{python}
+titles = soup.find_all("h2", class_="usa-card__heading")
+my_links=[]
+for title in titles:
+    link = title.find("a")
+    my_links.append(link.get("href"))
+```
+
+```{python}
+for link in my_links:
+  response = requests.get(link)
+  soup = BeautifulSoup(response.text, 'lxml')
+  for i in range(50):
+    uls = soup.find_all("ul", class_= "usa-list usa-list--unstyled margin-y-2")
+    for ul in uls:
+      lis = ul.find_all("span", class_="padding-right-2 text-base")
 
 ```
 
