@@ -61,14 +61,14 @@ from bs4 import BeautifulSoup
 ```
 
 ```{python}
-with open(r'/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/Ting_Gena_PS5/Enforcement Actions.html', 'r') as page:
-    text = page.read()
+url = "https://oig.hhs.gov/fraud/enforcement/"
+response = requests.get(url)
+text = response.text
 soup = BeautifulSoup(text, 'lxml')
 ```
 
 Title:
 ```{python}
-
 rows_title = []
 titles = soup.find_all("h2", class_="usa-card__heading")
 for title in titles:
@@ -112,6 +112,7 @@ df = pd.DataFrame({"title":rows_title,
                     "date":rows_date,
                     "category":rows_cat,
                     "link":rows_url})
+df.head()
 ```
 
 
@@ -129,15 +130,22 @@ for title in titles:
 ```{python}
 # go through the link and scrape the agency name 
 rows_agency =[]
+from urllib.parse import urljoin
 for link in my_links:
-  response = requests.get(link)
-  soup = BeautifulSoup(response.text, 'lxml')
-  uls = soup.find_all("ul", class_= "usa-list usa-list--unstyled margin-y-2")
-  for ul in uls:
-    lis = ul.find_all("span", class_="padding-right-2 text-base")
-    agency = lis[1]
-    agency_name = agency.next_sibling.strip()
+    full_url = urljoin(base_url, link)
+    response = requests.get(full_url)
+    soup = BeautifulSoup(response.text, 'lxml')
+    agency_section = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
+
+    agency_name = "NA"
+    
+    if agency_section:
+        for agency in agency_section.find_all("li"):
+            if "Agency:" in agency.get_text():
+                agency_name = agency.get_text(strip=True).replace("Agency: ", "")
+                break  
     rows_agency.append(agency_name)
+
 ```
 
 ```{python}
@@ -292,14 +300,29 @@ Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-fals
 
 
 
-
-
 * c. Test Partner's Code (PARTNER 1)
 
 ```{python}
-
-
+df_2021 = scrape_enforcement_actions(1, 2023)
 ```
+
+```{python}
+# save the df into excel so currently we don't need to run again
+df_2021.to_excel("df_2021.xlsx",index = False)
+```
+
+```{python}
+len(df_2021)
+```
+
+There are 1534 enforcement actions in the  dataframe
+
+```{python}
+df_2021.sort_values(by = "Date",ascending = False)
+```
+
+The earliest is September 8, 2023.
+The title is "Elite Medical Transport Agreed to Pay $153,000", the category is Fraud Self-Disclosures, and no agency to be found. 
 
 ## Step 3: Plot data based on scraped data
 
