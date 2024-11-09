@@ -71,11 +71,129 @@ alt.renderers.enable("png")
 ### 1. Turning the scraper into a function 
 
 * a. Pseudo-Code (PARTNER 2)
+Input Validation
+
+If year < 2013:
+Print a message: "Please enter a year greater than or equal to 2013."
+Return from the function (no further processing).
+Initialize Variables and Setup
+
+Create the base URL of the HHS OIG “Enforcement Actions” page.
+Initialize an empty list to store titles, dates, categories, links, and agency names.
+Loop to Crawl Pages Until Todays Date
+
+While there are more pages to crawl (starting from month and year up to todays date):
+Send a request to the current page URL.
+
+Parse the pages HTML content.
+
+Loop through each enforcement action on the page (for each enforcement action entry):
+
+Scrape title, date, category, and link.
+Append each piece of data to the respective list.
+Send a request to each actions link to scrape agency.
+Append the agency name to the agency list.
+Wait 1 second before requesting the next page (using time.sleep(1)).
+
+Create a DataFrame from Lists
+
+Use the pandas library to create a DataFrame with the scraped data.
+Output Data
+
+Generate a filename based on the year and month inputs.
+Save the DataFrame to a .csv file with this filename.
+End Function
 
 
 * b. Create Dynamic Scraper (PARTNER 2)
 
 ```{python}
+
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from datetime import datetime
+import time
+
+def scrape_enforcement_actions(start_month, start_year):
+    # Check if year is >= 2013
+    if start_year < 2013:
+        print("Please enter a year greater than or equal to 2013.")
+        return None
+
+    # Base URL
+    url = 'https://oig.hhs.gov/fraud/enforcement/'
+
+    # Initialize lists to store data
+    titles, dates, categories, links, agencies = [], [], [], [], []
+
+    # Send request to the main page
+    response = requests.get(url)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Loop through each enforcement action
+    for action in soup.find_all('li', class_='usa-card'):
+        # Extract title and link
+        title_tag = action.find('h2', class_='usa-card__heading').find('a')
+        title = title_tag.get_text(strip=True)
+        full_link = f"https://oig.hhs.gov{title_tag['href']}"
+        
+        # Add title and link to lists
+        titles.append(title)
+        links.append(full_link)
+
+        # Visit the enforcement action subpage to extract date, category, and agency
+        action_response = requests.get(full_link)
+        action_response.raise_for_status()
+        action_soup = BeautifulSoup(action_response.text, 'html.parser')
+        
+        # Extract date from the subpage
+        date_tag = action_soup.find('span', class_='padding-right-2 text-base')
+        date_text = date_tag.next_sibling.strip() if date_tag else "Date not found"
+
+        # Extract category from the subpage
+        category_section = action_soup.find('span', text="Enforcement Types:")
+        category_text = category_section.find_next('li').get_text(strip=True) if category_section else "Category not found"
+
+        # Extract agency information from the subpage
+        agency_section = action_soup.find('ul', class_='usa-list usa-list--unstyled margin-y-2')
+        agency_name = "Not specified"
+        if agency_section:
+            for item in agency_section.find_all('li'):
+                if "Agency:" in item.get_text():
+                    agency_name = item.get_text(strip=True).replace("Agency: ", "")
+                    break
+        
+        # Append data to lists
+        dates.append(date_text)
+        categories.append(category_text)
+        agencies.append(agency_name)
+
+        # Wait 1 second before the next request to avoid overloading the server
+        time.sleep(1)
+
+    # Create DataFrame
+    df = pd.DataFrame({
+        'Title': titles,
+        'Date': dates,
+        'Category': categories,
+        'Link': links,
+        'Agency': agencies
+    })
+
+    # Save to .csv file
+    filename = f"enforcement_actions_{start_year}_{start_month}.csv"
+    df.to_csv(filename, index=False)
+    print(f"Data saved to {filename}")
+
+    return df
+
+# Example usage:
+df = scrape_enforcement_actions(1, 2023)
+if df is not None:
+    print(df.head())
+
 
 ```
 
