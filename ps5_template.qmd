@@ -114,82 +114,86 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import datetime
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def scrape_enforcement_actions(start_month, start_year):
-    # Check if year is >= 2013
-    if start_year < 2013:
-        print("Please enter a year greater than or equal to 2013.")
-        return None
+```
 
-    # Base URL
-    url = 'https://oig.hhs.gov/fraud/enforcement/'
+```{python}
 
-    # Initialize lists to store data
-    titles, dates, categories, links, agencies = [], [], [], [], []
+def scrape_all_pages(base_url, start_date):
+    all_data = []
+    page_number = 1
 
-    # Send request to the main page
-    response = requests.get(url)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, 'html.parser')
+    while True:
+        url = f"{base_url}?page={page_number}"
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        actions = soup.find_all('li', class_='usa-card')
 
-    # Loop through each enforcement action
-    for action in soup.find_all('li', class_='usa-card'):
-        # Extract title and link
-        title_tag = action.find('h2', class_='usa-card__heading').find('a')
-        title = title_tag.get_text(strip=True)
-        full_link = f"https://oig.hhs.gov{title_tag['href']}"
-        
-        # Add title and link to lists
-        titles.append(title)
-        links.append(full_link)
+        if not actions:
+            break  
 
-        # Visit the enforcement action subpage to extract date, category, and agency
-        action_response = requests.get(full_link)
-        action_response.raise_for_status()
-        action_soup = BeautifulSoup(action_response.text, 'html.parser')
-        
-        # Extract date from the subpage
-        date_tag = action_soup.find('span', class_='padding-right-2 text-base')
-        date_text = date_tag.next_sibling.strip() if date_tag else "Date not found"
+        for action in actions:
+            title_tag = action.find('h2', class_='usa-card__heading').find('a')
+            title = title_tag.get_text(strip=True)
+            full_link = f"https://oig.hhs.gov{title_tag['href']}"
 
-        # Extract category from the subpage
-        category_section = action_soup.find('span', text="Enforcement Types:")
-        category_text = category_section.find_next('li').get_text(strip=True) if category_section else "Category not found"
+            
+            date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
+            action_date = datetime.strptime(date_text, "%B %d, %Y")
 
-        # Extract agency information from the subpage
-        agency_section = action_soup.find('ul', class_='usa-list usa-list--unstyled margin-y-2')
-        agency_name = "Not specified"
+            if action_date < start_date:
+                return pd.DataFrame(all_data)  
+
+            
+            category = action.find('ul', class_='display-inline add-list-reset').get_text(strip=True)
+
+            all_data.append({'Title': title, 'Date': date_text, 'Category': category, 'Link': full_link})
+
+        page_number += 1
+        time.sleep(1)
+
+    return pd.DataFrame(all_data)
+
+def fetch_agency(link):
+    try:
+        response = requests.get(link)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        agency_section = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
         if agency_section:
             for item in agency_section.find_all('li'):
                 if "Agency:" in item.get_text():
-                    agency_name = item.get_text(strip=True).replace("Agency: ", "")
-                    break
-        
-        # Append data to lists
-        dates.append(date_text)
-        categories.append(category_text)
-        agencies.append(agency_name)
+                    return item.get_text(strip=True).replace("Agency: ", "")
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {link}: {e}")
+    return 'N/A'
 
-        # Wait 1 second before the next request to avoid overloading the server
-        time.sleep(1)
+def get_agencies(df):
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_index = {executor.submit(fetch_agency, row['Link']): index for index, row in df.iterrows()}
+        agencies = ['N/A'] * len(df)
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            agencies[index] = future.result()
+    return agencies
 
-    # Create DataFrame
-    df = pd.DataFrame({
-        'Title': titles,
-        'Date': dates,
-        'Category': categories,
-        'Link': links,
-        'Agency': agencies
-    })
+def scrape_enforcement_actions(start_month, start_year):
+    base_url = 'https://oig.hhs.gov/fraud/enforcement/'
+    start_date = datetime(start_year, start_month, 1)
 
-    # Save to .csv file
+    df = scrape_all_pages(base_url, start_date)
+    df['Agency'] = get_agencies(df)
+    
+    
     filename = f"enforcement_actions_{start_year}_{start_month}.csv"
     df.to_csv(filename, index=False)
     print(f"Data saved to {filename}")
 
     return df
 
-# Example usage:
+
 df = scrape_enforcement_actions(1, 2023)
 if df is not None:
     print(df.head())
@@ -197,9 +201,23 @@ if df is not None:
 
 ```
 
+The total number of enforcement actions collected is 1534 
+Total enforcement actions collected is 1534
+Earliest enforcement action:
+Date: 2023-01-03 
+Title: Podiatrist Pays $90,000 To Settle False Billing Allegations
+Category: Criminal and Civil Actions
+Agency: January 3, 2023
+Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/ 
+
+
+
+
+
 * c. Test Partner's Code (PARTNER 1)
 
 ```{python}
+
 
 ```
 
