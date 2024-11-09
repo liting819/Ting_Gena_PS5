@@ -337,13 +337,55 @@ The title is "Elite Medical Transport Agreed to Pay $153,000", the category is F
 * based on "Criminal and Civil Actions" vs. "State Enforcement Agencies"
 
 ```{python}
+df_2021_filtered = df_2021.loc[df_2021["Category"].isin(["Criminal and Civil Actions", "State Enforcement Agencies"])]
 
+df_2021_filtered = df_2021_filtered.groupby(["Category","Date"]).agg( count = ("Title","count")).reset_index()
+```
+
+```{python}
+# make a plot
+chart = alt.Chart(df_2021_filtered).mark_line().encode(
+    x='Date:T',               
+    y='count:Q',             
+    color='Category:N'        
+).properties(
+    title="Enforcement Action Over Time by Category",
+    width=600,
+    height=400
+)
+chart
 ```
 
 * based on five topics
 
 ```{python}
+# filter the data into only CCA category
+df_cca = df_2021.loc[df_2021["Category"] == "Criminal and Civil Actions"].copy()
 
+# defult sub title = other
+df_cca["sub_cat"] = "Other" 
+
+#assigned title for subtitle
+df_cca.loc[df_cca["Title"].str.contains("Health Care", case=False, na=False), "sub_cat"] = "Health Care Fraud"
+df_cca.loc[df_cca["Title"].str.contains("Financial", case=False, na=False), "sub_cat"] = "Financial Fraud"
+df_cca.loc[df_cca["Title"].str.contains("Drug", case=False, na=False), "sub_cat"] = "Drug Enforcement"
+df_cca.loc[df_cca["Title"].str.contains("Bribery|Corruption", case=False, na=False), "sub_cat"] = "Bribery/Corruption"
+```
+
+```{python}
+# create the plot
+df_cca_grouped  = df_cca.groupby(["sub_cat","Date"]).agg(count = ("Title","count")).reset_index()
+
+chart = alt.Chart(df_cca_grouped).mark_line().encode(
+    x='Date:T',               
+    y='count:Q',             
+    color='sub_cat:N'        
+).properties(
+    title="Criminal and Civic Action Over Time",
+    width=600,
+    height=400
+)
+chart
 ```
 
 ## Step 4: Create maps of enforcement activity
@@ -351,9 +393,28 @@ The title is "Elite Medical Transport Agreed to Pay $153,000", the category is F
 ### 1. Map by State (PARTNER 1)
 
 ```{python}
+# create a column by state 
+df_2021['State'] = df_2021['Agency'].str.extract(r'State of ([A-Za-z]+(?:\s[A-Za-z]+)?)', expand=False)
+df_2021['State'].fillna("Not state level", inplace=True)
 
+# grouped the dataset by state, filter out the not state level
+df_2021_state = df_2021.loc[df_2021["State"]!= "Not state level"]
+df_state_group = df_2021_state.groupby("State").agg(count = ("Title","count")).reset_index()
 ```
 
+```{python}
+# read the shape file and merge 
+import geopandas as gpd
+filepath = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/Ting_Gena_PS5/cb_2018_us_state_500k 2/cb_2018_us_state_500k.shx"
+state_shp = gpd.read_file(filepath)
+
+state_merge = state_shp.merge(df_state_group, left_on='NAME', right_on='State', how='left')
+```
+
+```{python}
+# create choropleth of the number of enforcement action by state
+state_merge.plot(column="count", cmap = "Blues",legend=True).set_axis_off()
+```
 
 ### 2. Map by District (PARTNER 2)
 
