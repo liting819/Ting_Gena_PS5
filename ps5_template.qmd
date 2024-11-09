@@ -68,42 +68,57 @@ soup = BeautifulSoup(text, 'lxml')
 
 Title:
 ```{python}
+
+rows_title = []
 titles = soup.find_all("h2", class_="usa-card__heading")
-for title in titles[0:5]:
-    print(title.get_text())
+for title in titles:
+    rows_title.append(title.get_text().strip())
 ```
 
 Date:
 
 ```{python}
+rows_date = []
 divs = soup.find_all("div",class_ = "font-body-sm margin-top-1")
 for div in divs:
   dates = div.find_all("span",class_ = "text-base-dark padding-right-105")
   for date in dates:
-    print(date.get_text())
+    rows_date.append(date.get_text().strip())
 ```
 
 Catagories
 
 ```{python}
+rows_cat = []
 uls = soup.find_all("ul", class_="display-inline add-list-reset")
 for ul in uls:
   cat =ul.find("li", class_ ="display-inline-block usa-tag text-no-lowercase text-base-darkest bg-base-lightest margin-right-1")
-  print(cat.get_text())
+  rows_cat.append(cat.get_text())
 ```
 
 Links:
 
 ```{python}
+rows_url = []
 titles = soup.find_all("h2", class_="usa-card__heading")
 for title in titles:
     link = title.find("a")
-    print(link.get("href"))
+    rows_url.append(link.get("href"))
 ```
+
+```{python}
+# combine into dataset
+df = pd.DataFrame({"title":rows_title,
+                    "date":rows_date,
+                    "category":rows_cat,
+                    "link":rows_url})
+```
+
 
 ### 2. Crawling (PARTNER 1)
 
 ```{python}
+# store my links
 titles = soup.find_all("h2", class_="usa-card__heading")
 my_links=[]
 for title in titles:
@@ -112,14 +127,23 @@ for title in titles:
 ```
 
 ```{python}
+# go through the link and scrape the agency name 
+rows_agency =[]
 for link in my_links:
   response = requests.get(link)
   soup = BeautifulSoup(response.text, 'lxml')
-  for i in range(50):
-    uls = soup.find_all("ul", class_= "usa-list usa-list--unstyled margin-y-2")
-    for ul in uls:
-      lis = ul.find_all("span", class_="padding-right-2 text-base")
+  uls = soup.find_all("ul", class_= "usa-list usa-list--unstyled margin-y-2")
+  for ul in uls:
+    lis = ul.find_all("span", class_="padding-right-2 text-base")
+    agency = lis[1]
+    agency_name = agency.next_sibling.strip()
+    rows_agency.append(agency_name)
+```
 
+```{python}
+# add to the df and print head
+df["agency"]= rows_agency
+df.head()
 ```
 
 ## Step 2: Making the scraper dynamic
