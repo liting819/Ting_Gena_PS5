@@ -71,17 +71,153 @@ alt.renderers.enable("png")
 ### 1. Turning the scraper into a function 
 
 * a. Pseudo-Code (PARTNER 2)
+Input Validation
+
+If year < 2013:
+Print a message: "Please enter a year greater than or equal to 2013."
+Return from the function (no further processing).
+Initialize Variables and Setup
+
+Create the base URL of the HHS OIG “Enforcement Actions” page.
+Initialize an empty list to store titles, dates, categories, links, and agency names.
+Loop to Crawl Pages Until Todays Date
+
+While there are more pages to crawl (starting from month and year up to todays date):
+Send a request to the current page URL.
+
+Parse the pages HTML content.
+
+Loop through each enforcement action on the page (for each enforcement action entry):
+
+Scrape title, date, category, and link.
+Append each piece of data to the respective list.
+Send a request to each actions link to scrape agency.
+Append the agency name to the agency list.
+Wait 1 second before requesting the next page (using time.sleep(1)).
+
+Create a DataFrame from Lists
+
+Use the pandas library to create a DataFrame with the scraped data.
+Output Data
+
+Generate a filename based on the year and month inputs.
+Save the DataFrame to a .csv file with this filename.
+End Function
 
 
 * b. Create Dynamic Scraper (PARTNER 2)
 
 ```{python}
 
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from datetime import datetime
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 ```
+
+```{python}
+
+def scrape_all_pages(base_url, start_date):
+    all_data = []
+    page_number = 1
+
+    while True:
+        url = f"{base_url}?page={page_number}"
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        actions = soup.find_all('li', class_='usa-card')
+
+        if not actions:
+            break  
+
+        for action in actions:
+            title_tag = action.find('h2', class_='usa-card__heading').find('a')
+            title = title_tag.get_text(strip=True)
+            full_link = f"https://oig.hhs.gov{title_tag['href']}"
+
+            
+            date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
+            action_date = datetime.strptime(date_text, "%B %d, %Y")
+
+            if action_date < start_date:
+                return pd.DataFrame(all_data)  
+
+            
+            category = action.find('ul', class_='display-inline add-list-reset').get_text(strip=True)
+
+            all_data.append({'Title': title, 'Date': date_text, 'Category': category, 'Link': full_link})
+
+        page_number += 1
+        time.sleep(1)
+
+    return pd.DataFrame(all_data)
+
+def fetch_agency(link):
+    try:
+        response = requests.get(link)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        agency_section = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
+        if agency_section:
+            for item in agency_section.find_all('li'):
+                if "Agency:" in item.get_text():
+                    return item.get_text(strip=True).replace("Agency: ", "")
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {link}: {e}")
+    return 'N/A'
+
+def get_agencies(df):
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_index = {executor.submit(fetch_agency, row['Link']): index for index, row in df.iterrows()}
+        agencies = ['N/A'] * len(df)
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            agencies[index] = future.result()
+    return agencies
+
+def scrape_enforcement_actions(start_month, start_year):
+    base_url = 'https://oig.hhs.gov/fraud/enforcement/'
+    start_date = datetime(start_year, start_month, 1)
+
+    df = scrape_all_pages(base_url, start_date)
+    df['Agency'] = get_agencies(df)
+    
+    
+    filename = f"enforcement_actions_{start_year}_{start_month}.csv"
+    df.to_csv(filename, index=False)
+    print(f"Data saved to {filename}")
+
+    return df
+
+
+df = scrape_enforcement_actions(1, 2023)
+if df is not None:
+    print(df.head())
+
+
+```
+
+The total number of enforcement actions collected is 1534 
+Total enforcement actions collected is 1534
+Earliest enforcement action:
+Date: 2023-01-03 
+Title: Podiatrist Pays $90,000 To Settle False Billing Allegations
+Category: Criminal and Civil Actions
+Agency: January 3, 2023
+Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/ 
+
+
+
+
 
 * c. Test Partner's Code (PARTNER 1)
 
 ```{python}
+
 
 ```
 
