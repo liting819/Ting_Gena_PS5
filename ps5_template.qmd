@@ -26,8 +26,8 @@ output:
 ## Submission Steps (10 pts)
 1. This problem set is a paired problem set.
 2. Play paper, scissors, rock to determine who goes first. Call that person *Partner 1*.
-    - Partner 1 (name and cnet ID):
-    - Partner 2 (name and cnet ID):
+    - Partner 1 (name and cnet ID): Ting Tsai (liting)
+    - Partner 2 (name and cnet ID): Genevieve Madigan (madigang)
 3. Partner 1 will accept the `ps5` and then share the link it creates with their partner. You can only share it with one partner so you will not be able to change it after your partner has accepted. 
 4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\_\_\*\* \*\*\_\_\*\*
 5. "I have uploaded the names of anyone else other than my partner and I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  (1 point)
@@ -56,13 +56,69 @@ alt.renderers.enable("png")
 ### 1. Scraping (PARTNER 1)
 
 ```{python}
-
+import requests
+from bs4 import BeautifulSoup
 ```
 
-  
+```{python}
+with open(r'/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/Ting_Gena_PS5/Enforcement Actions.html', 'r') as page:
+    text = page.read()
+soup = BeautifulSoup(text, 'lxml')
+```
+
+Title:
+```{python}
+titles = soup.find_all("h2", class_="usa-card__heading")
+for title in titles[0:5]:
+    print(title.get_text())
+```
+
+Date:
+
+```{python}
+divs = soup.find_all("div",class_ = "font-body-sm margin-top-1")
+for div in divs:
+  dates = div.find_all("span",class_ = "text-base-dark padding-right-105")
+  for date in dates:
+    print(date.get_text())
+```
+
+Catagories
+
+```{python}
+uls = soup.find_all("ul", class_="display-inline add-list-reset")
+for ul in uls:
+  cat =ul.find("li", class_ ="display-inline-block usa-tag text-no-lowercase text-base-darkest bg-base-lightest margin-right-1")
+  print(cat.get_text())
+```
+
+Links:
+
+```{python}
+titles = soup.find_all("h2", class_="usa-card__heading")
+for title in titles:
+    link = title.find("a")
+    print(link.get("href"))
+```
+
 ### 2. Crawling (PARTNER 1)
 
 ```{python}
+titles = soup.find_all("h2", class_="usa-card__heading")
+my_links=[]
+for title in titles:
+    link = title.find("a")
+    my_links.append(link.get("href"))
+```
+
+```{python}
+for link in my_links:
+  response = requests.get(link)
+  soup = BeautifulSoup(response.text, 'lxml')
+  for i in range(50):
+    uls = soup.find_all("ul", class_= "usa-list usa-list--unstyled margin-y-2")
+    for ul in uls:
+      lis = ul.find_all("span", class_="padding-right-2 text-base")
 
 ```
 
