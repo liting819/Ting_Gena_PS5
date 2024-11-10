@@ -463,32 +463,49 @@ import geopandas as gpd
 import pandas as pd
 import matplotlib.pyplot as plt
 import re
+from difflib import get_close_matches
 ```
 
 
 ```{python}
 
-# Load the U.S. Attorney District shapefile (with all components present)
-shapefile_path = "C:/Users/madig/Documents/Github/Year 2024-2025/Ting_Gena_PS5/shapefile/geo_export_8ce2e721-0b80-43a4-a309-9fb04d333f17.shp"
+# Load the U.S. Attorney District shapefile
+shapefile_path = "C:/Users/madig/Documents/Github/Year 2024-2025/Ting_Gena_PS5/shapefile/geo_export_6e5b28e0-765a-4988-815c-d9e382e18d6b.shp"
 districts_shapefile = gpd.read_file(shapefile_path)
 
-# Load your enforcement actions data from the Excel file
-df = pd.read_excel("C:/Users/madig/Documents/Github/Year 2024-2025/Ting_Gena_PS5/df_2021.xlsx")
+# Load enforcement actions data
+df_2021 = pd.read_excel("df_2021.xlsx")
 
-# Step 1: Extract and clean district names from the "Agency" column
-df['District'] = df['Agency'].apply(lambda x: re.search(r'District of [A-Za-z ]+', x).group(0) if 'District' in x else None)
-df_districts = df.dropna(subset=['District'])
+# Step 1: Extract and standardize district names from the "Agency" column
+def extract_district(agency_text):
+    match = re.search(r'(Eastern|Western|Northern|Southern|Middle)?\s*District\s+of\s+([A-Za-z\s]+)', str(agency_text))
+    if match:
+        return f"{match.group(1).strip()} District of {match.group(2).strip()}" if match.group(1) else f"District of {match.group(2).strip()}"
+    return None
 
-# Step 2: Aggregate the number of enforcement actions by district
-district_counts = df_districts['District'].value_counts().reset_index()
-district_counts.columns = ['District', 'Enforcement_Count']
+df_2021['District_Name'] = df_2021['Agency'].apply(extract_district)
 
-# Step 3: Clean the 'District' names in both datasets to ensure they match for merging
-districts_shapefile['District'] = districts_shapefile['NAME'].str.replace(r'\s+District\s+of\s+', ' of ', regex=True)
-district_counts['District'] = district_counts['District'].str.replace(r'\s+District\s+of\s+', ' of ', regex=True)
+# Unique district names in df_2021
+district_names_in_data = df_2021['District_Name'].dropna().unique()
 
-# Step 4: Merge the district counts with the shapefile based on district names
-merged = districts_shapefile.merge(district_counts, on='District', how='left')
+# Unique district identifiers in shapefile
+district_names_in_shapefile = districts_shapefile['district_n'].unique()
+
+# Step 2: Automated Mapping using get_close_matches
+district_mapping = {}
+for district in district_names_in_data:
+    match = get_close_matches(district, district_names_in_shapefile, n=1, cutoff=0.6)
+    if match:
+        district_mapping[district] = match[0]
+
+# Map the extracted district names to identifiers in shapefile
+df_2021['District_ID'] = df_2021['District_Name'].map(district_mapping)
+
+# Step 3: Aggregate the number of enforcement actions by district ID
+district_counts = df_2021.groupby('District_ID').size().reset_index(name='Enforcement_Count')
+
+# Step 4: Merge with the shapefile based on district identifiers
+merged = districts_shapefile.merge(district_counts, left_on='district_n', right_on='District_ID', how='left')
 merged['Enforcement_Count'] = merged['Enforcement_Count'].fillna(0)  # Fill NaN values with 0 for districts with no data
 
 # Step 5: Plot the choropleth map
