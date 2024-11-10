@@ -336,6 +336,40 @@ Earliest enforcement action:
 
 ```{python}
 
+import matplotlib.pyplot as plt
+import pandas as pd
+from datetime import datetime
+
+# Load the Excel file into a DataFrame
+df = pd.read_excel("df_2021.xlsx")
+
+def plot_enforcement_actions_over_time(df, start_year=2021, start_month=1):
+    # Convert 'Date' column to datetime
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    
+    # Filter data to include only entries from January 2021 onward
+    start_date = datetime(start_year, start_month, 1)
+    df = df[df['Date'] >= start_date]
+    
+    # Group by month and year, and count enforcement actions per month
+    df['YearMonth'] = df['Date'].dt.to_period('M')
+    monthly_counts = df.groupby('YearMonth').size()
+
+    # Plot the line chart
+    plt.figure(figsize=(10, 6))
+    monthly_counts.plot(kind='line', marker='o')
+    plt.title("Number of Enforcement Actions Over Time (Aggregated by Month)")
+    plt.xlabel("Month-Year")
+    plt.ylabel("Number of Enforcement Actions")
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+# Example usage:
+plot_enforcement_actions_over_time(df)
+
+
 ```
 
 ### 2. Plot the number of enforcement actions categorized: (PARTNER 1)
@@ -425,6 +459,45 @@ state_merge.plot(column="count", cmap = "Blues",legend=True).set_axis_off()
 ### 2. Map by District (PARTNER 2)
 
 ```{python}
+import geopandas as gpd
+import pandas as pd
+import matplotlib.pyplot as plt
+import re
+```
+
+
+```{python}
+
+# Load the U.S. Attorney District shapefile (with all components present)
+shapefile_path = "C:/Users/madig/Documents/Github/Year 2024-2025/Ting_Gena_PS5/shapefile/geo_export_8ce2e721-0b80-43a4-a309-9fb04d333f17.shp"
+districts_shapefile = gpd.read_file(shapefile_path)
+
+# Load your enforcement actions data from the Excel file
+df = pd.read_excel("C:/Users/madig/Documents/Github/Year 2024-2025/Ting_Gena_PS5/df_2021.xlsx")
+
+# Step 1: Extract and clean district names from the "Agency" column
+df['District'] = df['Agency'].apply(lambda x: re.search(r'District of [A-Za-z ]+', x).group(0) if 'District' in x else None)
+df_districts = df.dropna(subset=['District'])
+
+# Step 2: Aggregate the number of enforcement actions by district
+district_counts = df_districts['District'].value_counts().reset_index()
+district_counts.columns = ['District', 'Enforcement_Count']
+
+# Step 3: Clean the 'District' names in both datasets to ensure they match for merging
+districts_shapefile['District'] = districts_shapefile['NAME'].str.replace(r'\s+District\s+of\s+', ' of ', regex=True)
+district_counts['District'] = district_counts['District'].str.replace(r'\s+District\s+of\s+', ' of ', regex=True)
+
+# Step 4: Merge the district counts with the shapefile based on district names
+merged = districts_shapefile.merge(district_counts, on='District', how='left')
+merged['Enforcement_Count'] = merged['Enforcement_Count'].fillna(0)  # Fill NaN values with 0 for districts with no data
+
+# Step 5: Plot the choropleth map
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+merged.plot(column='Enforcement_Count', cmap='OrRd', linewidth=0.8, ax=ax, edgecolor='0.8', legend=True)
+plt.title('Number of Enforcement Actions by U.S. Attorney District')
+plt.axis('off')
+plt.show()
+
 
 ```
 
