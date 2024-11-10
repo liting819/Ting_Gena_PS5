@@ -142,7 +142,7 @@ for link in my_links:
     if agency_section:
         for agency in agency_section.find_all("li"):
             if "Agency:" in agency.get_text():
-                agency_name = agency.get_text(strip=True).replace("Agency: ", "")
+                agency_name = agency.get_text(strip=True).replace("Agency:", "")
                 break  
     rows_agency.append(agency_name)
 
@@ -303,7 +303,7 @@ Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-fals
 * c. Test Partner's Code (PARTNER 1)
 
 ```{python}
-df_2021 = scrape_enforcement_actions(1, 2023)
+df_2021 = scrape_enforcement_actions(1, 2021)
 ```
 
 ```{python}
@@ -315,14 +315,20 @@ df_2021.to_excel("df_2021.xlsx",index = False)
 len(df_2021)
 ```
 
-There are 1534 enforcement actions in the  dataframe
-
 ```{python}
-df_2021.sort_values(by = "Date",ascending = False)
+df_2021_sort = df_2021.sort_values(by = "Date",ascending = True)
+df_2021_sort["Title"][0]
 ```
 
-The earliest is September 8, 2023.
-The title is "Elite Medical Transport Agreed to Pay $153,000", the category is Fraud Self-Disclosures, and no agency to be found. 
+
+Total enforcement actions collected is 3022
+Earliest enforcement action:
+    Date: 2021-04-01
+    Title: 'Red Rocks Radiation and Oncology, Alliance HealthCare Services, and Dr. Kevin Schewe Agreed to Pay $754,000 for Allegedly Violating the Civil Monetary Penalties Law by Submitting False Claims for Radiation and Oncology Services'
+    Category: Fraud Self-Disclosures
+    Agency: N/A
+    Link: https://oig.hhs.gov/fraud/enforcement/red-rocks-radiation-and-oncology-alliance-healthcare-services-and-dr-kevin-schewe-agreed-to-pay-754000-for-allegedly-violating-the-civil-monetary-penalties-law-by-submitting-false-claims-for-radiation-and-oncology-services/
+
 
 ## Step 3: Plot data based on scraped data
 
