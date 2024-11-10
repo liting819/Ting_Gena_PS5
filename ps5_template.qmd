@@ -44,21 +44,17 @@ output:
 import pandas as pd
 import altair as alt
 import time
+import requests
+from bs4 import BeautifulSoup
 
 import warnings 
 warnings.filterwarnings('ignore')
-alt.renderers.enable("png")
 ```
 
 
 ## Step 1: Develop initial scraper and crawler
 
 ### 1. Scraping (PARTNER 1)
-
-```{python}
-import requests
-from bs4 import BeautifulSoup
-```
 
 ```{python}
 url = "https://oig.hhs.gov/fraud/enforcement/"
@@ -196,14 +192,9 @@ End Function
 * b. Create Dynamic Scraper (PARTNER 2)
 
 ```{python}
-
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
 from datetime import datetime
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 ```
 
 ```{python}
@@ -281,12 +272,12 @@ def scrape_enforcement_actions(start_month, start_year):
 
     return df
 
+```
 
+```{python}
 df = scrape_enforcement_actions(1, 2023)
 if df is not None:
     print(df.head())
-
-
 ```
 
 The total number of enforcement actions collected is 1534 
@@ -377,12 +368,16 @@ plot_enforcement_actions_over_time(df)
 * based on "Criminal and Civil Actions" vs. "State Enforcement Agencies"
 
 ```{python}
+df_2021 = pd.read_excel("df_2021.xlsx")
 df_2021_filtered = df_2021.loc[df_2021["Category"].isin(["Criminal and Civil Actions", "State Enforcement Agencies"])]
 
 df_2021_filtered = df_2021_filtered.groupby(["Category","Date"]).agg( count = ("Title","count")).reset_index()
 ```
 
 ```{python}
+import altair as alt 
+from vega_datasets import data
+
 # make a plot
 chart = alt.Chart(df_2021_filtered).mark_line().encode(
     x='Date:T',               
@@ -470,7 +465,7 @@ from difflib import get_close_matches
 ```{python}
 
 # Load the U.S. Attorney District shapefile
-shapefile_path = "C:/Users/madig/Documents/Github/Year 2024-2025/Ting_Gena_PS5/shapefile/geo_export_6e5b28e0-765a-4988-815c-d9e382e18d6b.shp"
+shapefile_path = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/Ting_Gena_PS5/US Attorney Districts Shapefile simplified_20241110/geo_export_f5fd10c0-5f39-4a40-ab5f-d8894bfc7694.shx"
 districts_shapefile = gpd.read_file(shapefile_path)
 
 # Load enforcement actions data
