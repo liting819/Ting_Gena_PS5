@@ -1,9 +1,9 @@
 ---
-title: "title"
-author: "author"
-date: "date"
+title: "PS5"
+author: "Ting & Genevieve"
+date: "2024.11.10"
 format: 
-  pdf:
+  html:
     include-in-header: 
        text: |
          \usepackage{fvextra}
@@ -46,7 +46,6 @@ import altair as alt
 import time
 import requests
 from bs4 import BeautifulSoup
-
 import warnings 
 warnings.filterwarnings('ignore')
 ```
@@ -128,6 +127,7 @@ for title in titles:
 rows_agency =[]
 from urllib.parse import urljoin
 for link in my_links:
+    base_url = "https://oig.hhs.gov/"
     full_url = urljoin(base_url, link)
     response = requests.get(full_url)
     soup = BeautifulSoup(response.text, 'lxml')
@@ -454,63 +454,58 @@ state_merge.plot(column="count", cmap = "Blues",legend=True).set_axis_off()
 ### 2. Map by District (PARTNER 2)
 
 ```{python}
-import geopandas as gpd
-import pandas as pd
-import matplotlib.pyplot as plt
 import re
 from difflib import get_close_matches
 ```
 
 
-```{python}
 
 # Load the U.S. Attorney District shapefile
+```{python}
 shapefile_path = "/Users/tsaili-ting/Uchicago/Year2/Y2Fall/Python2/Ting_Gena_PS5/US Attorney Districts Shapefile simplified_20241110/geo_export_f5fd10c0-5f39-4a40-ab5f-d8894bfc7694.shx"
 districts_shapefile = gpd.read_file(shapefile_path)
+```
 
-# Load enforcement actions data
-df_2021 = pd.read_excel("df_2021.xlsx")
+```{python}
+# Regular expression to capture the full district name and ensure correct formatting
+district_pattern = r'(Eastern|Western|Northern|Southern)?\s?District\s?of\s([A-Za-z\s]+)'
 
-# Step 1: Extract and standardize district names from the "Agency" column
-def extract_district(agency_text):
-    match = re.search(r'(Eastern|Western|Northern|Southern|Middle)?\s*District\s+of\s+([A-Za-z\s]+)', str(agency_text))
-    if match:
-        return f"{match.group(1).strip()} District of {match.group(2).strip()}" if match.group(1) else f"District of {match.group(2).strip()}"
-    return None
+# Extract both direction and district name using expand=True to return two columns
+df_2021[['Direction', 'District']] = df_2021['Agency'].str.extract(district_pattern, expand=True)
 
-df_2021['District_Name'] = df_2021['Agency'].apply(extract_district)
+# Combine direction and district into one column, or "Not district level" if no match
+df_2021['District'] = df_2021.apply(
+    lambda x: f"{x['Direction']} District of {x['District']}" if pd.notnull(x['Direction']) and pd.notnull(x['District']) 
+              else f"District of {x['District']}" if pd.notnull(x['District']) 
+              else 'Not district level', axis=1)
 
-# Unique district names in df_2021
-district_names_in_data = df_2021['District_Name'].dropna().unique()
+# Drop the separate Direction column
+df_2021.drop(columns=['Direction'], inplace=True)
 
-# Unique district identifiers in shapefile
-district_names_in_shapefile = districts_shapefile['district_n'].unique()
+# Display the resulting DataFrame with the 'District' column
+print(df_2021[['Agency', 'District']])
 
-# Step 2: Automated Mapping using get_close_matches
-district_mapping = {}
-for district in district_names_in_data:
-    match = get_close_matches(district, district_names_in_shapefile, n=1, cutoff=0.6)
-    if match:
-        district_mapping[district] = match[0]
+```
 
-# Map the extracted district names to identifiers in shapefile
-df_2021['District_ID'] = df_2021['District_Name'].map(district_mapping)
+```{python}
+# groupby District
+df_dist = df_2021.groupby(["District"]).agg(count = ("Title","count")).reset_index()
+```
 
-# Step 3: Aggregate the number of enforcement actions by district ID
-district_counts = df_2021.groupby('District_ID').size().reset_index(name='Enforcement_Count')
+```{python}
+# merge the data and the shape file
+dist_merge = districts_shapefile.merge(df_dist, left_on='judicial_d', right_on='District', how='left')
+```
 
-# Step 4: Merge with the shapefile based on district identifiers
-merged = districts_shapefile.merge(district_counts, left_on='district_n', right_on='District_ID', how='left')
-merged['Enforcement_Count'] = merged['Enforcement_Count'].fillna(0)  # Fill NaN values with 0 for districts with no data
+```{python}
+# create the map 
+ax = dist_merge.plot(column="count", cmap="Blues", legend=True, figsize=(15, 15))
+ax.set_xlim(-170, -60) 
+ax.set_ylim(20, 85)  
 
-# Step 5: Plot the choropleth map
-fig, ax = plt.subplots(1, 1, figsize=(15, 10))
-merged.plot(column='Enforcement_Count', cmap='OrRd', linewidth=0.8, ax=ax, edgecolor='0.8', legend=True)
-plt.title('Number of Enforcement Actions by U.S. Attorney District')
-plt.axis('off')
+ax.set_axis_off()
+
 plt.show()
-
-
 ```
 
 ## Extra Credit
